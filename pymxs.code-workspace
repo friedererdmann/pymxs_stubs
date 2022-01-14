@@ -4,5 +4,7 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.pythonPath": "c:/Program Files/Autodesk/3ds Max 2021/Python37/python.exe"
+	}
 }
