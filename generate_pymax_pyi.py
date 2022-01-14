@@ -17,12 +17,15 @@ def is_generated_code(obj):
 
 
 def format_method_name(name, obj):
-    """"Format pymxs.runtime method names to be all lower case"""
-    if is_generated_code(obj):
-        method_name = name.lower()
-    else:
-        method_name = name
-    return method_name
+    if name in ["getmxsprop", "setmxsprop", "run_redo", "run_undo"]:
+        return name
+    return format_class_name(name, obj)
+    # """"Format pymxs.runtime method names to be all lower case"""
+    # if is_generated_code(obj):
+    #     method_name = name.lower()
+    # else:
+    #     method_name = name
+    # return method_name
 
 
 def format_class_name(name, obj=None):
@@ -63,10 +66,15 @@ def write_method(name, obj, module, base_indent):
     return functions
 
 
-def write_class(class_name, obj, base_indent):
+def get_parent_class_name(obj):
     class_of = str(pymxs.runtime.classof(obj))
     parent_class = format_class_name(class_of)
-    if class_of == "PyWrapperBase":
+    return parent_class
+
+
+def write_class(class_name, obj, base_indent):
+    parent_class = get_parent_class_name(obj)
+    if parent_class == "PyWrapperBase":
         parent_class = ""
     if parent_class == class_name:
         parent_class = ""
@@ -130,8 +138,9 @@ def get_dir(module, indentation=0, classes=None, output=False):
         if keyword.iskeyword(full_name) or "#Struct" in full_name:
             continue
         type_name = type(obj).__name__
+        parent_class = get_parent_class_name(obj)
         # print(x,y,type_name)
-        if type_name in ["function", "builtin_function_or_method", "method_descriptor"]:
+        if type_name in ["function", "builtin_function_or_method", "method_descriptor"] or parent_class in ["Primitive"]:
             line = write_method(name, obj, module, base_indent)
             lines = append_and_print(lines, line, output)
         elif type_name in classes:
