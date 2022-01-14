@@ -1,6 +1,7 @@
 import os
 import inspect
 import keyword
+import re
 import pymxs
 
 
@@ -29,6 +30,10 @@ def format_method_name(name, obj):
 
 
 def format_class_name(name, obj=None):
+    if name.startswith("<") and name.endswith(">"):
+        name = name[1:-1]
+    if name.startswith("&"): name = name[1:]
+    name = name.replace(" ", "")
     if name == "runtime":
         return name
     if not obj:
@@ -86,31 +91,94 @@ def find_properties(obj, one_indent):
     try:
         prop_names = pymxs.runtime.GetPropNames(obj)
     except RuntimeError:
-        pass
-    else:
+        return None
+    try:
+        instance = obj()
+    except RuntimeError:
+        return None
+    properties = []
+    for prop in prop_names:
+        prop_name = str(prop).upper()  # moving property names to upper to avoid keyword conflicts
+        if not prop_name.isidentifier() or keyword.iskeyword(prop_name):
+            continue
         try:
-            instance = obj()
-        except RuntimeError:
+            typehint = type(getattr(instance, prop_name)).__name__
+        except (RuntimeError, AttributeError):
             pass
         else:
-            properties = []
-            for prop in prop_names:
-                prop_name = str(prop).upper()  # moving property names to upper to avoid keyword conflicts
-                if not prop_name.isidentifier() or keyword.iskeyword(prop_name):
-                    continue
-                try:
-                    typehint = type(getattr(instance, prop_name)).__name__
-                except (RuntimeError, AttributeError):
-                    pass
-                else:
-                    if typehint == "NoneType":
-                        typehint = "None"
-                    property_definition = f"{one_indent}{prop_name}: {typehint}"
-                    properties.append(property_definition)
-            properties = list(set(properties))
-            properties.sort()
-            return properties
-    return None
+            if typehint == "NoneType":
+                typehint = "None"
+            property_definition = f"{one_indent}{prop_name}: {typehint}"
+            properties.append(property_definition)
+    properties = list(set(properties))
+    properties.sort()
+    return properties
+
+
+def find_interfaces(obj, one_indent):
+    lines = []
+    skip = ["Event",
+            "ExportMesh()"]
+    if str(obj).startswith(("DYNFUN", "Px", "px")) or str(obj) in skip:
+        return lines
+    try:
+        instance = obj()
+    except (RuntimeError, TypeError):
+        return None
+    res = pymxs.runtime.stringStream('')
+    print(str(obj))
+    try:
+        pymxs.runtime.showInterfaces(instance, to=res)
+    except RuntimeError:
+        return None
+    print(str(obj))
+    output = str(res).splitlines()
+    mode = ""
+    methods = []
+    new_method = []
+    for line in output:
+        line_content = line.strip()
+        if line_content == "Properties:":
+            mode = ""
+            continue
+        elif line_content == "Methods:":
+            mode = "Methods"
+            continue
+        elif line_content == "Actions:":
+            if new_method:
+                methods.append(new_method)
+                new_method = []
+            mode = ""
+            continue
+        if mode == "Methods":
+            if line_content.startswith("<"):
+                if new_method:
+                    methods.append(new_method)
+                new_method = []
+                new_method.append(line_content)
+            new_method.append(line_content)
+    for method in methods:
+        definition = method[0]
+        pattern = r"(<[A-Za-z\s&\d]*>)([A-Za-z]+)"
+        return_name, *mandatory_parameters = re.findall(pattern, definition)
+        pattern = r"([A-Za-z]+):(<[A-Za-z\s&\d]*>)"
+        optional_parameters = re.findall(pattern, definition)
+        return_class, method_name = return_name
+        return_type = format_class_name(return_class)
+        if return_type == "Void":
+            return_type = "None"
+        else:
+            return_type = "runtime." + return_type
+        parameters = {format_class_name(name): "runtime." + format_class_name(class_type) for class_type, name in mandatory_parameters}
+        optional_parameters = {format_class_name(name): "runtime." + format_class_name(class_type) for name, class_type in optional_parameters}
+        params = str(parameters)[1:-1].replace("'","")
+        optionals = str(optional_parameters)[1:-1].replace("'","")
+        if params and optionals:
+            params += ","
+        lines.append(f"{one_indent}def {method_name}({params} {optionals}) -> {return_type}: ...")
+    lines.sort()
+    return lines
+    # print(methods)
 
 
 def append_and_print(lines, line, output=False):
@@ -134,7 +202,10 @@ def get_dir(module, indentation=0, classes=None, output=False):
         if not name.isidentifier() or keyword.iskeyword(name) or name.startswith("__") or "unknown" in name.lower():
             continue
         obj = getattr(module, name)
-        full_name = repr(obj)
+        try:
+            full_name = repr(obj)
+        except RuntimeError:
+            continue
         if keyword.iskeyword(full_name) or "#Struct" in full_name:
             continue
         type_name = type(obj).__name__
@@ -150,6 +221,8 @@ def get_dir(module, indentation=0, classes=None, output=False):
             lines = append_and_print(lines, class_definition, output)
             property_definition = find_properties(obj, one_indent)
             lines = append_and_print(lines, property_definition, output)
+            interface_definition = find_interfaces(obj, one_indent)
+            lines = append_and_print(lines, interface_definition, output)
             closing_dots = f"{one_indent}..."
             lines = append_and_print(lines, closing_dots, output)
             if not indentation:
