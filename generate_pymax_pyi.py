@@ -126,12 +126,10 @@ def find_interfaces(obj, one_indent):
     except (RuntimeError, TypeError):
         return None
     res = pymxs.runtime.stringStream('')
-    print(str(obj))
     try:
         pymxs.runtime.showInterfaces(instance, to=res)
     except RuntimeError:
         return None
-    print(str(obj))
     output = str(res).splitlines()
     mode = ""
     methods = []
@@ -211,7 +209,7 @@ def get_dir(module, indentation=0, classes=None, output=False):
         type_name = type(obj).__name__
         parent_class = get_parent_class_name(obj)
         # print(x,y,type_name)
-        if type_name in ["function", "builtin_function_or_method", "method_descriptor"] or parent_class in ["Primitive"]:
+        if type_name in ["function", "builtin_function_or_method", "method_descriptor"] or parent_class in ["Primitive", "MAXScriptFunction"]:
             line = write_method(name, obj, module, base_indent)
             lines = append_and_print(lines, line, output)
         elif type_name in classes:
