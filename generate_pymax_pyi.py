@@ -173,6 +173,7 @@ def find_interfaces(obj, one_indent):
         optionals = str(optional_parameters)[1:-1].replace("'","")
         if params and optionals:
             params += ","
+        method_name = format_class_name(method_name)
         lines.append(f"{one_indent}def {method_name}({params} {optionals}) -> {return_type}: ...")
     lines.sort()
     return lines
