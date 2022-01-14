@@ -130,3 +130,6 @@ dmypy.json
 .vscode/settings.json
 mxspycom/
 !mxspycom/placeholder.txt
+html_offline_help/
+!html_offline_help/download.txt
+
