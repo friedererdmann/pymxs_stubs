@@ -96,22 +96,26 @@ def get_dir(module, indentation=0, classes=None, output=False):
             except RuntimeError:
                 pass
             else:
-                instance = obj()
-                for prop in prop_names:
-                    prop_name = str(prop).upper()  # moving property names to upper to avoid keyword conflicts
-                    if not prop_name.isidentifier() or keyword.iskeyword(prop_name):
-                        continue
-                    try:
-                        typehint = type(getattr(instance, prop_name)).__name__
-                    except (RuntimeError, AttributeError):
-                        pass
-                    else:
-                        if typehint == "NoneType":
-                            typehint = "None"
-                        property_definition = f"{one_indent}{prop_name}: {typehint}"
-                        if output:
-                            print(property_definition)
-                        lines.append(property_definition)
+                try:
+                    instance = obj()
+                except RuntimeError:
+                    pass
+                else:
+                    for prop in prop_names:
+                        prop_name = str(prop).upper()  # moving property names to upper to avoid keyword conflicts
+                        if not prop_name.isidentifier() or keyword.iskeyword(prop_name):
+                            continue
+                        try:
+                            typehint = type(getattr(instance, prop_name)).__name__
+                        except (RuntimeError, AttributeError):
+                            pass
+                        else:
+                            if typehint == "NoneType":
+                                typehint = "None"
+                            property_definition = f"{one_indent}{prop_name}: {typehint}"
+                            if output:
+                                print(property_definition)
+                            lines.append(property_definition)
             closing_dots = f"{one_indent}..."
             if output:
                 print(closing_dots)
