@@ -51,6 +51,71 @@ def get_method_signature(name, obj):
     return signature
 
 
+def write_method(name, obj, module, base_indent):
+    method_name = format_method_name(name, obj)
+    signature = get_method_signature(name, obj)
+    if name in ["getmxsprop", "setmxsprop"]:
+        if module not in [pymxs.MXSWrapperBase, pymxs.MXSWrapperObjectSet, pymxs.MXSWrapperObjectSetIter]:
+            return None
+        if name == "getmxsprop": signature = "(self, key: str)"
+        if name == "setmxsprop": signature = "(self, key: str, value)"
+    functions = f"{base_indent}def {method_name}{signature}: ..."
+    return functions
+
+
+def write_class(class_name, obj, base_indent):
+    class_of = str(pymxs.runtime.classof(obj))
+    parent_class = format_class_name(class_of)
+    if class_of == "PyWrapperBase":
+        parent_class = ""
+    if parent_class == class_name:
+        parent_class = ""
+    class_definition = f"{base_indent}class {class_name}({parent_class}):"
+    return class_definition
+
+
+def find_properties(obj, one_indent):
+    try:
+        prop_names = pymxs.runtime.GetPropNames(obj)
+    except RuntimeError:
+        pass
+    else:
+        try:
+            instance = obj()
+        except RuntimeError:
+            pass
+        else:
+            properties = []
+            for prop in prop_names:
+                prop_name = str(prop).upper()  # moving property names to upper to avoid keyword conflicts
+                if not prop_name.isidentifier() or keyword.iskeyword(prop_name):
+                    continue
+                try:
+                    typehint = type(getattr(instance, prop_name)).__name__
+                except (RuntimeError, AttributeError):
+                    pass
+                else:
+                    if typehint == "NoneType":
+                        typehint = "None"
+                    property_definition = f"{one_indent}{prop_name}: {typehint}"
+                    properties.append(property_definition)
+            properties = list(set(properties))
+            properties.sort()
+            return properties
+    return None
+
+
+def append_and_print(lines, line, output=False):
+    if isinstance(line, str):
+        if output: print(line)
+        lines.append(line)
+    if isinstance(line, list):
+        if output:
+            for entry in line: print(entry)
+        lines += line
+    return lines
+
+
 def get_dir(module, indentation=0, classes=None, output=False):
     base_indent = SPACE * indentation
     one_indent = SPACE * (indentation+1)
@@ -67,59 +132,17 @@ def get_dir(module, indentation=0, classes=None, output=False):
         type_name = type(obj).__name__
         # print(x,y,type_name)
         if type_name in ["function", "builtin_function_or_method", "method_descriptor"]:
-            method_name = format_method_name(name, obj)
-            signature = get_method_signature(name, obj)
-            if name in ["getmxsprop", "setmxsprop"]:
-                if module not in [pymxs.MXSWrapperBase, pymxs.MXSWrapperObjectSet, pymxs.MXSWrapperObjectSetIter]:
-                    continue
-                if name == "getmxsprop": signature = "(self, key: str)"
-                if name == "setmxsprop": signature = "(self, key: str, value)"
-            functions = f"{base_indent}def {method_name}{signature}: ..."
-            if output:
-                print(functions)
-            lines.append(functions)
+            line = write_method(name, obj, module, base_indent)
+            lines = append_and_print(lines, line, output)
         elif type_name in classes:
             class_name = format_class_name(name, obj)
             classes.append(class_name)
-            class_of = str(pymxs.runtime.classof(obj))
-            parent_class = format_class_name(class_of)
-            if class_of == "PyWrapperBase":
-                parent_class = ""
-            if parent_class == class_name:
-                parent_class = ""
-            class_definition = f"{base_indent}class {class_name}({parent_class}):"
-            if output:
-                print(class_definition)
-            lines.append(class_definition)
-            try:
-                prop_names = pymxs.runtime.GetPropNames(obj)
-            except RuntimeError:
-                pass
-            else:
-                try:
-                    instance = obj()
-                except RuntimeError:
-                    pass
-                else:
-                    for prop in prop_names:
-                        prop_name = str(prop).upper()  # moving property names to upper to avoid keyword conflicts
-                        if not prop_name.isidentifier() or keyword.iskeyword(prop_name):
-                            continue
-                        try:
-                            typehint = type(getattr(instance, prop_name)).__name__
-                        except (RuntimeError, AttributeError):
-                            pass
-                        else:
-                            if typehint == "NoneType":
-                                typehint = "None"
-                            property_definition = f"{one_indent}{prop_name}: {typehint}"
-                            if output:
-                                print(property_definition)
-                            lines.append(property_definition)
+            class_definition = write_class(class_name, obj, base_indent)
+            lines = append_and_print(lines, class_definition, output)
+            property_definition = find_properties(obj, one_indent)
+            lines = append_and_print(lines, property_definition, output)
             closing_dots = f"{one_indent}..."
-            if output:
-                print(closing_dots)
-            lines.append(closing_dots)
+            lines = append_and_print(lines, closing_dots, output)
             if not indentation:
                 # currently only one level of recursion
                 increment = indentation + 1
