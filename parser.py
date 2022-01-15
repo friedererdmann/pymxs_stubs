@@ -22,7 +22,6 @@ def format_class_name(name, obj=None):
     if name.startswith("<") and name.endswith(">"):
         name = name[1:-1]
     if name.startswith("&"): name = name[1:]
-    name = name.replace(" ", "")
     if name == "runtime":
         return name
     if not obj:
@@ -37,6 +36,7 @@ def format_class_name(name, obj=None):
             class_name += l[1]
     if class_name == "Void":
         class_name = "None"
+    class_name = class_name.replace(" ", "")
     return class_name
 
 
@@ -127,7 +127,7 @@ def parse_strings(string_list, signifier=".", output=parse_property):
 
 
 def parse_interface(string_list):
-    interface_name = string_list[0].strip()[len(INTERFACE)+1:]
+    interface_name = format_class_name(string_list[0].strip()[len(INTERFACE)+1:])
     if interface_name in INTERFACES:
         return
     INTERFACES.append(interface_name)
