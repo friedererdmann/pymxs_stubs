@@ -35,6 +35,8 @@ def format_class_name(name, obj=None):
             class_name += l[0]
         else:
             class_name += l[1]
+    if class_name == "Void":
+        class_name = "None"
     return class_name
 
 
