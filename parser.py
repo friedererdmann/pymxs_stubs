@@ -9,6 +9,7 @@ ACTIONS = "Actions:"
 SPACE = "    "
 
 INTERFACES = []
+METHOD_LIST = []
 
 
 def pairwise(iterable):
@@ -73,6 +74,7 @@ def parse_property(string_list):
 
 
 def parse_methods(string_list):
+    global METHOD_LIST
     signature = string_list[0]
     comments = string_list[1:]
     pattern = r"(<[A-Za-z\s&\d]*>)([A-Za-z]+)"
@@ -99,13 +101,19 @@ def parse_methods(string_list):
         method_string += f"{name}: {value} = {default_value}, "
 
     if method_string[-1] == " ": method_string = method_string[:-2]
-    method_string += f") -> {return_value}: ..."
+    method_string += f") -> {return_value}:"
+    if method_string in METHOD_LIST:
+        return
+    if [line for line in METHOD_LIST if line.startswith(f"def {method_name}(")]:
+        print(f"{SPACE}@overload")
+    METHOD_LIST.append(method_string)
     print(method_string)
     if comments:
         print(f"{SPACE}{SPACE}\"\"\"")
         for comment in comments:
             print(f"{SPACE}{SPACE}{comment}")
         print(f"{SPACE}{SPACE}\"\"\"")
+    print(f"{SPACE}{SPACE}...")
 
 
 def parse_strings(string_list, signifier=".", output=parse_property):
@@ -127,20 +135,23 @@ def parse_strings(string_list, signifier=".", output=parse_property):
 
 
 def parse_interface(string_list):
+    global METHOD_LIST
     interface_name = format_class_name(string_list[0].strip()[len(INTERFACE)+1:])
     if interface_name in INTERFACES:
         return
     INTERFACES.append(interface_name)
-    print(f"class {interface_name}:")
+    print(f"class {interface_name}(pymxs.runtime.Interface):")
     property_line = string_list.index(f"   {PROPERTIES}")
     method_line = string_list.index(f"   {METHODS}")
     action_line = string_list.index(f"   {ACTIONS}")
     properties_lines = string_list[property_line+1:method_line]
     parse_strings(properties_lines, ".", parse_property)
     methods = string_list[method_line+1:action_line]
+    METHOD_LIST = []
     parse_strings(methods, "<", parse_methods)
     actions = string_list[action_line+1:]
-    # haven't seen actions yet
+    # not relevant for pymxs (?) - e.g. pymxs.runtime.FixAmbient
+    # print(actions)
     print(f"{SPACE}...")
 
 
