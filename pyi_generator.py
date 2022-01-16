@@ -18,20 +18,29 @@ class Attribute:
     default: Optional[Any] = None
     comment: str = ""
     index: int
+    read_only: bool = False
 
-    def __init__(self, name, type_hint: str = "", default: Optional[Any] = None, comment: str = ""):
+    def __init__(self, name, type_hint: str = "", default: Optional[Any] = None, comment: str = "", read_only: bool = False):
         self.name = name
         self.type_hint = type_hint
         self.default = default
         self.comment = comment
+        self.read_only = read_only
 
     def __str__(self):
-        string = f"{self.name}"
-        if self.type_hint:
-            string += f": {self.type_hint}"
-        if self.default:
-            string += f" = {str(self.default)}"
-        return string
+        if not self.read_only:
+            string = f"{self.name}"
+            if self.type_hint:
+                string += f": {self.type_hint}"
+            if self.default:
+                string += f" = {str(self.default)}"
+            return string
+        else:
+            string = f"@property{LB}"
+            string += f"def {self.name}(self)"
+            if self.type_hint:
+                string += f" -> {self.type_hint}: ..."
+            return string
 
     @staticmethod
     def is_default(attribute: Attribute):
@@ -116,8 +125,9 @@ class Class(Object):
         for attribute in self.attributes:
             if not attribute.type_hint and not attribute.default:
                 attribute.type_hint = "Any"
-            string += f"{INDENT}{str(attribute)}"
-            if attribute.comment:
+            for line in str(attribute).splitlines():
+                string += f"{INDENT}{line}{LB}"
+            if attribute.comment and not attribute.read_only:  # TODO
                 string += f"  # {attribute.comment}"
             string += "\n"
         for method in self.methods:
