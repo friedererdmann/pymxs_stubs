@@ -8,3 +8,6 @@ box.HEIGHT = 5
 
 sky = pymxs.runtime.IES_Sky()
 print(sky.IsSky())
+
+pymxs.runtime.BirthGroup.Init()
+pymxs.runtime.BirthGroup
