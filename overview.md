@@ -12,7 +12,7 @@ We can gather information on maxscript and pymxs from these locations/methods:
   - Gets us a view on the underlying interface classes and their actions, methods and attributes (properties)
   - A whitelist and blacklist of known inspectable classes is in `get_all.py`
 - `dir()` in python on `pymxs` and its members
-  - Done in `generate_pymaxs_pyi.py`
+  - Done in `generate_pymaxs_pyi.py` (this is the first version of this pyi)
   - Inspect all members of an element in Python
 - (`pymxs.runtime.`)`GetPropNames`
   - Get attributes (properties) of (initialized) objects
@@ -25,6 +25,10 @@ We can gather information on maxscript and pymxs from these locations/methods:
 - Guessing Signatures
   - Script in `guess_signatures.py` to run a Python method over and over again parsing Error Messages to see what the expected signature is
   - Doesn't seem feasible at the moment
+- Manually authored pyi files
+  - A number of people have started writing pyi files from scratch
+  - The system should allow to have a place to push manually written pyi files and merge them in
+  - e.g. check for good hand written doc strings or fixes to signatures (needs a model to describe changes)
 - Per class inspection:
 ```python
 node = pymxs.runtime.box
