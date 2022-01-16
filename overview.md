@@ -1,8 +1,9 @@
 We can gather information on maxscript and pymxs from these locations/methods:
 
-- Maxscript API Autocomplete
-  - Text document meant for autocompletion
-  - Not sure yet what the outcome is
+- ~~Maxscript API Autocomplete~~
+  - ~~Text document meant for autocompletion~~
+  - ~~Not sure yet what the outcome is~~
+  - After looking at the script that creates it, its the same as/similar to `apropos` approach
 - (`pymxs.runtime.`) `apropos`
   - Returns all variables in the current scope of Max.
   - Similar output to the Maxscript API Autocomplete but not complete overlap
