@@ -56,10 +56,11 @@ def parse_property(string_list):
     name = name[1:].upper()
     value = format_class_name(value)
     comment_str = ""
+    pattern = r"#([\w]*)"
+    find_comments = re.compile(pattern)
     for comment in comments:
         if " enums:" in comment:
-            pattern = r"#([\w]*)"
-            values = re.findall(pattern, comment)
+            values = find_comments.findall(comment)
             comment_str = f"# {', '.join(values)} - rt.Name(\"\")"
         else:
             comment_str = f"# {comment}"

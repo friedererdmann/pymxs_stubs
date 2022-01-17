@@ -201,8 +201,9 @@ def analyze_structdef_chunk(chunk):
     data = list()
     functions = list()
     pattern = r"\s+(\w*):<(\w*)>;\s+(\w*)"
+    struct_member = re.compile(pattern)
     for line in lines:
-        match = re.match(pattern, line)
+        match = struct_member.match(line)
         if not match:
             continue
         name, kind, public = match.groups()
@@ -256,10 +257,11 @@ def parse_property(string_list):
     name, value, mode = property.split(" : ")
     name = format_class_name(name)
     comment_str = ""
+    pattern = r"#([\w]*)"
+    find_comments = re.compile(pattern)
     for comment in comments:
         if " enums:" in comment:
-            pattern = r"#([\w]*)"
-            values = re.findall(pattern, comment)
+            values = find_comments.findall(pattern, comment)
             comment_str = f"{', '.join(values)} - rt.Name(\"\")"
         else:
             comment_str = f"{comment}"
