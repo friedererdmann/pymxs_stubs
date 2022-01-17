@@ -7,7 +7,7 @@ MULTILINE = "\"\"\""
 
 
 def get_default_list_for_none(inp):
-    if inp:
+    if inp is not None:
         return inp
     return list()
 
