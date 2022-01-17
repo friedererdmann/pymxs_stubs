@@ -12,6 +12,13 @@ def get_default_list_for_none(inp):
     return list()
 
 
+def convert_enum_str(string):
+    string = string.replace("#", "")
+    string = string.strip()
+    string = f"Name(\"{string}\")"
+    return string
+
+
 class Attribute:
     name: str
     type_hint: str = ""
@@ -33,7 +40,12 @@ class Attribute:
             if self.type_hint:
                 string += f": {self.type_hint}"
             if self.default:
-                string += f" = {str(self.default)}"
+                default: str = self.default
+                if "#" in default:
+                    default = convert_enum_str(default)
+                if "f" in default and self.type_hint == "Time":
+                    default.replace("f", "") # still not working?
+                string += f" = {str(default)}"
             return string
         else:
             string = f"@property{LB}"
