@@ -189,8 +189,10 @@ def get_name_and_type_from_chunk(chunk):
     if not match:
         return
     name, parent = match.groups()
-    parent = parent.replace('const ', '')
-    return name, parent
+    parent = parent.replace('const', '')
+    parent = parent.replace('system', '')
+    parent = parent.strip()
+    return format_class_name(name), format_class_name(parent)
 
 
 def analyze_structdef_chunk(chunk):
@@ -220,10 +222,10 @@ def add_methods_and_members_to_struct_def(cls_name, functions, data):
     cls: pyi_generator.Class
     cls = get_pyi_classes_from_list([cls_name])[0]
     for function in functions:
-        method = pyi_generator.Method(function)
+        method = pyi_generator.Method(format_class_name(function))
         cls.methods.append(method)
     for attribute in data:
-        prop = pyi_generator.Attribute(attribute)
+        prop = pyi_generator.Attribute(format_class_name(attribute))
         cls.attributes.append(prop)
 
 
@@ -261,7 +263,7 @@ def parse_property(string_list):
     find_comments = re.compile(pattern)
     for comment in comments:
         if " enums:" in comment:
-            values = find_comments.findall(pattern, comment)
+            values = find_comments.findall(comment)
             comment_str = f"{', '.join(values)} - rt.Name(\"\")"
         else:
             comment_str = f"{comment}"
@@ -336,10 +338,18 @@ def build_interfaces(obj):
         actions = chunk[action_line+1:]
         # not relevant for pymxs (?) - e.g. pymxs.runtime.FixAmbient
         # print(actions)
+        if name == "Class": inherit = list()  # This should not inherit from anything
         CLASSES[name] = pyi_generator.Class(name, attributes=attributes, methods=functions)
 
 
 def generate_class(name, parents: List[str] = None):
+    if "." in name:
+        index = name.find(".")
+        parent = name[:index]
+        if parent not in CLASSES:
+            generate_class(parent)
+        CLASSES[parent].sub_cls.append(generate_class(name[index+1:], parents))
+        return
     obj = pymxs_get_obj_from_string(name)
     max_base_class = pymxs_get_class_name(obj)
     interfaces = get_interface_names(obj)
@@ -350,6 +360,7 @@ def generate_class(name, parents: List[str] = None):
     if name in parent_names:
         parent_names.remove(name)
     parent_classes = get_pyi_classes_from_list(parent_names)
+    if name == "Class": inherit = list()  # This should not inherit from anything
     CLASSES[name] = pyi_generator.Class(name, inherit=parent_classes)
     return CLASSES[name]
 
@@ -368,6 +379,10 @@ apropos = generate_apropos_list()
 chunks = split_apropos_output_into_chunks(apropos)
 for i, chunk in enumerate(chunks):
     name, parent = get_name_and_type_from_chunk(chunk)
+    if not name.isidentifier() or name in ["nvpxText"]:
+        continue
+    if parent == "Internal":
+        continue
     generate_class(name, [parent])
     if parent == 'StructDef':
         functions, data = analyze_structdef_chunk(chunk)
