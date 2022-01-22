@@ -13,12 +13,14 @@ Copy the `pymxs.pyi` file to a path where you'd usually be able to call `import 
 > These Stubs come as they are: I make no promises that they work or cover all your needs.
 
 ## Development
+### Setup
 - Open Directory in VSCode
 - Pick the 3Ds Max Python as your interpreter
 - Unzip [latest MXSPyCom Release](https://github.com/techartorg/MXSPyCOM/releases) into `/mxspycom`
-- Run `debug/start_debug.py` in Max
-- Run Debug configuration `Python: Remote Attach`
-- Run task `Execute Script in 3Ds Max` on `generate_pymax_pyi.py` file
+### Once per 3Ds Max session
+- Run `/mxspycom/intialize_COM_server.ms` in 3Ds Max Script Editor or add the script to your startup scripts in Max
+### Debugging from VSCode
+- Run `generate_pymax_pyi.py` file with `Attach debugger and run script` configuration
 
 ## Current scope
 - Works in 3Ds Max 2021
