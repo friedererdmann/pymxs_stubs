@@ -1,0 +1,1 @@
+[MaxScript 2022](https://help.autodesk.com/view/MAXDEV/2022/ENU/?guid=GUID-F039181A-C072-4469-A329-AE60FF7535E7)

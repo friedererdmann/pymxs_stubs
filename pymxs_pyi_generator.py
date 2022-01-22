@@ -3,168 +3,89 @@ import os
 import re
 import pymxs
 import importlib
+
 from typing import List
-from itertools import tee
+
+from testing.new_test import Interface
 
 path = os.path.split(__file__)[0]
 if not path in sys.path:
     sys.path.append(path)
 import pyi_generator
 importlib.reload(pyi_generator)
+import helper
+importlib.reload(helper)
+import pymxs_cmds
+importlib.reload(pymxs_cmds)
+import parser
+importlib.reload(parser)
 
 
 CLASSES = dict()
 
 
-def pairwise(iterable):
-    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
-    a, b = tee(iterable)
-    next(b, None)
-    return zip(a, b)
-
-
-def even(integer):
-    return integer//2 == integer/2
-
-
-def relative_file(file_name):
-    path = os.path.split(__file__)[0]
-    return os.path.join(path, file_name)
-
-
-def strip_string_stream(string):
-    start = 'StringStream:"'
-    end = '"'
-    return string[len(start):-len(end)]
-
-
-def pymxs_get_class_name(obj):
-    return str(pymxs.runtime.classof(obj))
-
-
-def pymxs_get_interface_descriptions(obj):
-    a = pymxs.runtime.stringStream('')
-    try:
-        pymxs.runtime.showInterfaces(obj, to=a)
-    except RuntimeError:
-        pass
-    return strip_string_stream(str(a))
-
-
-def pymxs_get_obj_from_string(string):
-    module_name = "pymxs.runtime"
-    if "." in string:
-        index = string.rfind(".")
-        path = string[:index]
-        string = string[index+1:]
-        module_name += f".{path}"
-    try:
-        module = eval(module_name)
-    except AttributeError:
-        return None
-    try:
-        return getattr(module, string)
-    except AttributeError:
-        return None
-
-
-def generate_apropos_list():
-    string_stream = pymxs.runtime.stringStream('')
-    pymxs.runtime.apropos("", to=string_stream)
-    return strip_string_stream(str(string_stream))
-
-
-def parse_maxscript_autocomplete():
-    with open(relative_file('maxscript/maxscript.api')) as file:
-        file_content = file.read()
-    analyze = []
-    for line in file_content.splitlines():
-        if line.isidentifier():
-            analyze.append(line)
-        elif all([x.isidentifier() for x in line.split(".")]):
-            analyze.append(line)
-        else:
-            continue
-    return analyze
-
-
 def check_item_list(list_of_strings):
     valid_items = []
     for item in list_of_strings:
-        obj = pymxs_get_obj_from_string(item)
+        obj = pymxs_cmds.get_pymxs_obj_from_name(item)
         if obj is not None:
             valid_items.append(item)
     return valid_items
 
 
-def split_apropos_output_into_chunks(apropos):
+def split_apropos_output_into_parts(apropos: str) -> List[str]:
+    continuation_symbols = ('  ','\t','\"', "(", ")")
     chunks = list()
-    chunk = list()
-    stay_open = False
-    quotations = 0
+    chunk = ""
+    stay_open: bool = False
+    quotations: int = 0
     for line in apropos.splitlines():
         quotations += line.count("\"")
-        if line.startswith(('  ','\t','\"', "(", ")")) or stay_open or not line:
-            chunk.append(line)
-            if even(quotations):
+        if line.startswith(continuation_symbols) or stay_open or not line:
+            chunk += f"\n{line}"
+            if helper.even(quotations):
                 stay_open = False
             continue
-        if not even(quotations):
+        if not helper.even(quotations):
             stay_open = True
         else:
             stay_open = False
         if chunk and not stay_open:
             chunks.append(chunk)
             quotations = 0
-        chunk = [line]
+        chunk = line
     if chunk:
         chunks.append(chunk)
     return chunks
 
 
-def write_apropos_chunk_files():
-    apropos = generate_apropos_list()
-    chunks = split_apropos_output_into_chunks(apropos)
-    for i, chunk in enumerate(chunks):
-        with open(relative_file(f"apropos\\{i:04}.txt"), "w") as file:
-            for line in chunk:
-                file.write(f"{line}\n")
-
-
-def get_interface_name(string_list):
-    pattern = r"(?:[\S\s]*):\s+([\S\s]*)"
-    match: re.Match
-    match = re.match(pattern, string_list[0])
-    interface_name = match.groups()[0]
-    # parse and create the rest of the interface parser.py
-    return interface_name
-
-
-def break_interface_string_to_chunks(string):
+def split_interface_definitions(string: str) -> List[str]:
     interfaces = list()
     lines = string.splitlines()
-    interface_lines = list()
-    for i, line in enumerate(lines):
+    interface = ""
+    for line in lines:
         if line.strip().startswith("Interface:"):
-            interface_lines.append(i)
-    interface_lines.append(len(lines))
-    interface_borders = list(pairwise(interface_lines))
-    for interface in interface_borders:
-        interfaces.append(lines[interface[0]:interface[1]])
+            if interface:
+                interfaces.append(Interface)
+            interface = line
+        else:
+            interface += f"\n{line}"
+    if interface:
+        interfaces.append(Interface)
     return interfaces
 
 
-def get_interfaces_as_chunks(obj):
-    interfaces_description = pymxs_get_interface_descriptions(obj)
-    interfaces = break_interface_string_to_chunks(interfaces_description)
-    return interfaces
+def get_interface_definitions_from_obj(obj) -> List[str]:
+    interfaces_description = pymxs_cmds.pymxs_show_interfaces(obj)
+    definitions = split_interface_definitions(interfaces_description)
+    return definitions
 
 
-def get_interface_names(obj):
-    interfaces = get_interfaces_as_chunks(obj)
+def get_interface_names_for_obj(obj):
+    interfaces = get_interface_definitions_from_obj(obj)
     interface_names = list()
     for interface in interfaces:
-        name = get_interface_name(interface)
+        name = parser.get_interface_name_from_description(interface)
         interface_names.append(name)
     return interface_names
 
@@ -178,28 +99,8 @@ def get_pyi_classes_from_list(name_list):
     return classes
 
 
-def get_name_and_type_from_chunk(chunk):
-    if isinstance(chunk, str):
-        lines = chunk.splitlines()
-    else:
-        lines = chunk
-    definition = lines[0].split(":", maxsplit=1)[0]
-    pattern = r"([\S\s]*)\s+(?:\(([\S\s]*)\))"
-    match = re.match(pattern, definition)
-    if not match:
-        return
-    name, parent = match.groups()
-    parent = parent.replace('const', '')
-    parent = parent.replace('system', '')
-    parent = parent.strip()
-    return format_class_name(name), format_class_name(parent)
-
-
-def analyze_structdef_chunk(chunk):
-    if isinstance(chunk, str):
-        lines = chunk.splitlines()
-    else:
-        lines = chunk
+def analyze_structdef_definition(definition):
+    lines = definition.splitlines()
     data = list()
     functions = list()
     pattern = r"\s+(\w*):<(\w*)>;\s+(\w*)"
@@ -323,11 +224,11 @@ def parse_strings(string_list, signifier=".", output=parse_property):
 
 
 def build_interfaces(obj):
-    interface_chunks = get_interfaces_as_chunks(obj)
+    interface_chunks = get_interface_definitions_from_obj(obj)
     attributes = list()
     functions = list()
     for chunk in interface_chunks:
-        name = get_interface_name(chunk)
+        name = parser.get_interface_name_from_description(chunk)
         property_line = chunk.index(f"   Properties:")
         method_line = chunk.index(f"   Methods:")
         action_line = chunk.index(f"   Actions:")
@@ -350,9 +251,9 @@ def generate_class(name, parents: List[str] = None):
             generate_class(parent)
         CLASSES[parent].sub_cls.append(generate_class(name[index+1:], parents))
         return
-    obj = pymxs_get_obj_from_string(name)
-    max_base_class = pymxs_get_class_name(obj)
-    interfaces = get_interface_names(obj)
+    obj = pymxs_cmds.get_pymxs_obj_from_name(name)
+    max_base_class = pymxs_cmds.pymxs_classof(obj)
+    interfaces = get_interface_names_for_obj(obj)
     build_interfaces(obj)
     if not parents:
         parents = list()
@@ -365,30 +266,29 @@ def generate_class(name, parents: List[str] = None):
     return CLASSES[name]
 
 
-# items = parse_maxscript_autocomplete()
-# valid = check_item_list(items)
-# print(len(items), len(valid))
-
-# with open(relative_file("apropros.txt"), "w") as file:
-#     file.write(generate_apropos_list())
+# with open(helper.relative_file("apropros.txt"), "w") as file:
+#     file.write(helper.pymxs_apropos())
 
 
 # write_apropos_chunk_files()
 
-apropos = generate_apropos_list()
-chunks = split_apropos_output_into_chunks(apropos)
-for i, chunk in enumerate(chunks):
-    name, parent = get_name_and_type_from_chunk(chunk)
+apropos = pymxs_cmds.pymxs_apropos()
+definitions = split_apropos_output_into_parts(apropos)
+parents = list()
+for i, definition in enumerate(definitions):
+    name, parent = parser.get_name_and_type_from_definition(definition)
+    parents.append(parent.lower())
     if not name.isidentifier() or name in ["nvpxText"]:
         continue
     if parent == "Internal":
         continue
-    generate_class(name, [parent])
-    if parent == 'StructDef':
-        functions, data = analyze_structdef_chunk(chunk)
-        add_methods_and_members_to_struct_def(name, functions, data)
-
-pyi = pyi_generator.PYI(classes=CLASSES.values())
-with open(relative_file('new_test.pyi'), 'w') as file:
-    file.write(str(pyi))
+    # generate_class(name, [parent])
+    # if parent == 'StructDef':
+    #     functions, data = analyze_structdef_definition(definition)
+    #     add_methods_and_members_to_struct_def(name, functions, data)
+for name in list(set(parents)):
+    print(name)
+# pyi = pyi_generator.PYI(classes=CLASSES.values())
+# with open(helper.relative_file('new_test.pyi'), 'w') as file:
+#     file.write(str(pyi))
 
