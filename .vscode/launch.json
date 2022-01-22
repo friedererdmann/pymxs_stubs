@@ -5,6 +5,33 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Run script in Max",
+            "type": "python",
+            "request": "launch",
+            "preLaunchTask": "Execute Script in 3ds Max",
+            "code": "pass",
+            "presentation": {
+                "hidden": true,
+                "group": "",
+                "order": 1
+            }
+        },
+        {
+            "name": "Attach debugger to 3Ds Max",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "${workspaceFolder}"
+                }
+            ]
+        },
+        {
             "name": "Python: Remote Attach",
             "type": "python",
             "request": "attach",
@@ -18,6 +45,13 @@
                     "remoteRoot": "${workspaceFolder}"
                 }
             ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Attach debugger and run script",
+            "configurations": ["Attach debugger to 3Ds Max", "Run script in Max"],
+            "preLaunchTask": "Enable Debug in 3Ds Max",
         }
     ]
 }

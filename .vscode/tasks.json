@@ -15,7 +15,25 @@
                 "echo": false,
                 "reveal": "never",
                 "focus": false,
-                "panel": "dedicated"
+                "panel": "shared",
+                "close": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Enable Debug in 3Ds Max",
+            "type": "shell",
+            "command": "${workspaceFolder}\\MXSPyCOM\\MXSPyCOM.exe",
+            "args": [
+                "-s",
+                "${workspaceFolder}\\debug\\start_debug.py"
+            ],
+            "presentation": {
+                "echo": false,
+                "reveal": "never",
+                "focus": false,
+                "panel": "shared",
+                "close": true
             },
             "problemMatcher": []
         }
