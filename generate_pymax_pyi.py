@@ -2,11 +2,110 @@ import os
 import inspect
 import keyword
 import re
+import traceback
 import pymxs
+
+from pymxs import runtime as mxRt
+from collections import defaultdict
 
 
 SPACE = "    "
 BASE_CLASS_TYPES = ["type", "class", "runtime"]
+MXS_TO_PY_TYPES = {
+    "void": None,
+    "node": mxRt.Node,
+    "matrix3": mxRt.Matrix3,
+    "boolean": bool,
+    "integer": int,
+    "float": float,
+}
+
+
+def get_struct_definition(struct_data):
+    struct_data = str(struct_data)
+    def collect_metadata(interface_data):
+        interface_data = list(map(str.strip, interface_data))
+        properties_line_start = interface_data.index("Properties:")
+        properties_line_end = interface_data.index("Methods:")
+        methods_line_start = properties_line_end
+        methods_line_end = interface_data.index("Actions:")
+        actions_line_start = methods_line_end
+        data = defaultdict(list)
+        for line_index, line in enumerate(interface_data):
+            if not line or line == '"':
+                continue
+
+            if line_index > properties_line_start and line_index < properties_line_end:
+                data["properties"].append(line)
+            if line_index > methods_line_start and line_index < methods_line_end:
+                data["methods"].append(line)
+            if line_index > actions_line_start:
+                data["actions"].append(line)
+
+        return data
+
+    def collect_method_arguments(method_data):
+        out_method_data = defaultdict(lambda: defaultdict(list))
+        for data in method_data:
+            arguments = data.split("<")
+            return_type, method_name = arguments[1].split(">")
+            clean_method_name = method_name.rstrip("()").strip()
+            # out_method_data[clean_method_name]["return_type"] = MXS_TO_PY_TYPES[return_type]
+            out_method_data[clean_method_name]["signature"] = data
+            out_method_data[clean_method_name]["return_type"] = return_type
+            if method_name.endswith("()"):
+                continue
+            out_method_data[clean_method_name]["arguments"] = [
+                {key: val for (key,val) in zip(("type", "name"), _split.split(">")) } for _split in arguments if _split
+            ]
+
+        return out_method_data
+
+    if "(const Interface):" in struct_data or "(const StructDef)" in struct_data:
+        # struct_name = for a = 1 to streamLine.Count while streamLine[a] != " " do structName += streamLine[a]
+        struct_name = struct_data.split()[0]
+        struct = mxRt.Execute(struct_name)
+        interface_stream = mxRt.StringStream("")
+        mxRt.ShowInterface(struct, to=interface_stream)
+        interface_data = str(interface_stream).splitlines()
+        metadata = collect_metadata(interface_data)
+        method_data = collect_method_arguments(metadata["methods"])
+
+        return method_data
+
+
+def get_struct_definitions(print_output=False):
+    data = {}
+    globals_stream = mxRt.StringStream("")
+    mxRt.Apropos("", to=globals_stream)
+    mxs_globals = str(globals_stream).splitlines()
+    for obj in mxs_globals:
+        try:
+            metadata = get_struct_definition(obj)
+            if not metadata:
+                continue
+
+            struct_name = obj.split()[0]
+            data[struct_name] = metadata
+        except KeyError:
+            traceback.print_exc()
+        except Exception:
+            pass
+
+    if print_output:
+        for k, v in data.items():
+            print(k)
+            for _k, _v in v.items():
+                print(f"-- {_k}:")
+                for __k, __v in _v.items():
+                    print(f"---- {__k}:")
+                    if isinstance(__v, str):
+                        print(f"------ {__v}:")
+                        continue
+                    for ___v in __v:
+                        for ____k, ____v in ___v.items():
+                            print(f"------ {____k}:")
+                            print(f"-------- {____v}")
 
 
 def is_generated_code(obj):
@@ -205,8 +304,10 @@ def get_dir(module, indentation=0, classes=None, output=False):
             full_name = repr(obj)
         except RuntimeError:
             continue
-        if keyword.iskeyword(full_name) or "#Struct" in full_name:
+        if keyword.iskeyword(full_name):
             continue
+        if "#Struct" in full_name:
+            pass
         type_name = type(obj).__name__
         parent_class = get_parent_class_name(obj)
         # print(x,y,type_name)
@@ -243,3 +344,16 @@ def run():
 
 
 run()
+get_struct_definitions()
+
+
+# for k, v in data["autosave"].items():
+#     print(k)
+#     print(v)
+
+# data = "<boolean>CopyData <node>srcnode <node>dstnode"
+# split = data.split("<")
+# for s in split:
+#     print(s)
+
+# print([{key: val for (key,val) in zip(("type", "name"), _split.split(">")) } for _split in split if _split])
