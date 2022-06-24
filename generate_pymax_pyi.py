@@ -32,7 +32,8 @@ def format_method_name(name, obj):
 def format_class_name(name, obj=None):
     if name.startswith("<") and name.endswith(">"):
         name = name[1:-1]
-    if name.startswith("&"): name = name[1:]
+    if name.startswith("&"):
+        name = name[1:]
     name = name.replace(" ", "")
     if name == "runtime":
         return name
@@ -65,8 +66,10 @@ def write_method(name, obj, module, base_indent):
     if name in ["getmxsprop", "setmxsprop"]:
         if module not in [pymxs.MXSWrapperBase, pymxs.MXSWrapperObjectSet, pymxs.MXSWrapperObjectSetIter]:
             return None
-        if name == "getmxsprop": signature = "(self, key: str)"
-        if name == "setmxsprop": signature = "(self, key: str, value)"
+        if name == "getmxsprop":
+            signature = "(self, key: str)"
+        if name == "setmxsprop":
+            signature = "(self, key: str, value)"
     functions = f"{base_indent}def {method_name}{signature}: ..."
     return functions
 
@@ -98,7 +101,8 @@ def find_properties(obj, one_indent):
         return None
     properties = []
     for prop in prop_names:
-        prop_name = str(prop).upper()  # moving property names to upper to avoid keyword conflicts
+        # moving property names to upper to avoid keyword conflicts
+        prop_name = str(prop).upper()
         if not prop_name.isidentifier() or keyword.iskeyword(prop_name):
             continue
         try:
@@ -167,26 +171,44 @@ def find_interfaces(obj, one_indent):
             return_type = "None"
         else:
             return_type = "runtime." + return_type
-        parameters = {format_class_name(name): "runtime." + format_class_name(class_type) for class_type, name in mandatory_parameters}
-        optional_parameters = {format_class_name(name): "runtime." + format_class_name(class_type) for name, class_type in optional_parameters}
-        params = str(parameters)[1:-1].replace("'","")
-        optionals = str(optional_parameters)[1:-1].replace("'","")
+        parameters = {format_class_name(name): "runtime." + format_class_name(
+            class_type) for class_type, name in mandatory_parameters}
+        optional_parameters = {format_class_name(
+            name): "runtime." + format_class_name(class_type) for name, class_type in optional_parameters}
+        params = str(parameters)[1:-1].replace("'", "")
+        optionals = str(optional_parameters)[1:-1].replace("'", "")
         if params and optionals:
             params += ","
         method_name = format_class_name(method_name)
-        lines.append(f"{one_indent}def {method_name}({params} {optionals}) -> {return_type}: ...")
+        lines.append(
+            f"{one_indent}def {method_name}({params} {optionals}) -> {return_type}: ...")
     lines.sort()
     return lines
     # print(methods)
 
 
+def find_structs():
+    for var in pymxs.runtime.globalVars.gather():
+        try:
+            obj = pymxs.runtime.execute(str(var))
+        except RuntimeError:
+            continue
+
+        if pymxs.runtime.classOf(obj) != pymxs.runtime.StructDef:
+            continue
+
+        print(obj)
+
+
 def append_and_print(lines, line, output=False):
     if isinstance(line, str):
-        if output: print(line)
+        if output:
+            print(line)
         lines.append(line)
     if isinstance(line, list):
         if output:
-            for entry in line: print(entry)
+            for entry in line:
+                print(entry)
         lines += line
     return lines
 
