@@ -2,6 +2,7 @@ import os
 import inspect
 import keyword
 import re
+from typing import List
 import pymxs
 
 
@@ -64,7 +65,11 @@ def write_method(name, obj, module, base_indent):
     method_name = format_method_name(name, obj)
     signature = get_method_signature(name, obj)
     if name in ["getmxsprop", "setmxsprop"]:
-        if module not in [pymxs.MXSWrapperBase, pymxs.MXSWrapperObjectSet, pymxs.MXSWrapperObjectSetIter]:
+        if module not in [
+            pymxs.MXSWrapperBase,
+            pymxs.MXSWrapperObjectSet,
+            pymxs.MXSWrapperObjectSetIter,
+        ]:
             return None
         if name == "getmxsprop":
             signature = "(self, key: str)"
@@ -121,15 +126,14 @@ def find_properties(obj, one_indent):
 
 def find_interfaces(obj, one_indent):
     lines = []
-    skip = ["Event",
-            "ExportMesh()"]
+    skip = ["Event", "ExportMesh()"]
     if str(obj).startswith(("DYNFUN", "Px", "px")) or str(obj) in skip:
         return lines
     try:
         instance = obj()
     except (RuntimeError, TypeError):
         return None
-    res = pymxs.runtime.stringStream('')
+    res = pymxs.runtime.stringStream("")
     try:
         pymxs.runtime.showInterfaces(instance, to=res)
     except RuntimeError:
@@ -171,33 +175,79 @@ def find_interfaces(obj, one_indent):
             return_type = "None"
         else:
             return_type = "runtime." + return_type
-        parameters = {format_class_name(name): "runtime." + format_class_name(
-            class_type) for class_type, name in mandatory_parameters}
-        optional_parameters = {format_class_name(
-            name): "runtime." + format_class_name(class_type) for name, class_type in optional_parameters}
+        parameters = {
+            format_class_name(name): "runtime." + format_class_name(class_type)
+            for class_type, name in mandatory_parameters
+        }
+        optional_parameters = {
+            format_class_name(name): "runtime." + format_class_name(class_type)
+            for name, class_type in optional_parameters
+        }
         params = str(parameters)[1:-1].replace("'", "")
         optionals = str(optional_parameters)[1:-1].replace("'", "")
         if params and optionals:
             params += ","
         method_name = format_class_name(method_name)
         lines.append(
-            f"{one_indent}def {method_name}({params} {optionals}) -> {return_type}: ...")
+            f"{one_indent}def {method_name}({params} {optionals}) -> {return_type}: ..."
+        )
     lines.sort()
     return lines
     # print(methods)
 
 
-def find_structs():
+def find_structs() -> List[str]:
+    lines = []
+
+    # Loop through all global variables
     for var in pymxs.runtime.globalVars.gather():
+
+        # Attempt to execute it, if it fails we'll just skip to the next one
         try:
             obj = pymxs.runtime.execute(str(var))
         except RuntimeError:
             continue
 
+        # If it's not a StructDef, we'll continue
         if pymxs.runtime.classOf(obj) != pymxs.runtime.StructDef:
             continue
 
-        print(obj)
+        # Split the struct by each line
+        struct = str(obj).split("\n")
+        varLines = []
+        funcLines = []
+        for index, prop in enumerate(struct):
+            if index == 0:
+                className = prop.split(":")[-1][:-1].strip()
+                line = f"class {className}(StructDef):"
+                lines.append(line)
+            if index > 0:
+                propType = re.findall("<(.+?)>", prop)[0]  # Should only find one
+                propName = prop.split(":")[0].strip()
+
+                # Format functions
+                if propType == "fn":
+                    line = f"\tdef {propName}() -> Any: ..."
+                    funcLines.append(line)
+                # Format data (private?)
+                elif propType == "data":
+                    continue
+                # Format system globals (public?)
+                elif propType == "systemGlobal":
+                    propValue = getattr(obj, propName)
+                    propType = str(pymxs.runtime.ClassOf(propValue))
+                    line = f"\t{propName}: runtime.{propType}"
+                    varLines.append(line)
+                # If somehow the line contains none of these keys, just continue
+                else:
+                    continue
+        varLines.sort()
+        lines.extend(varLines)
+        funcLines.sort()
+        lines.extend(funcLines)
+        lines.append("\t...")
+
+    return lines
 
 
 def append_and_print(lines, line, output=False):
@@ -215,12 +265,17 @@ def append_and_print(lines, line, output=False):
 
 def get_dir(module, indentation=0, classes=None, output=False):
     base_indent = SPACE * indentation
-    one_indent = SPACE * (indentation+1)
+    one_indent = SPACE * (indentation + 1)
     if not classes:
         classes = BASE_CLASS_TYPES
     lines = []
     for name in dir(module):
-        if not name.isidentifier() or keyword.iskeyword(name) or name.startswith("__") or "unknown" in name.lower():
+        if (
+            not name.isidentifier()
+            or keyword.iskeyword(name)
+            or name.startswith("__")
+            or "unknown" in name.lower()
+        ):
             continue
         obj = getattr(module, name)
         try:
@@ -232,7 +287,11 @@ def get_dir(module, indentation=0, classes=None, output=False):
         type_name = type(obj).__name__
         parent_class = get_parent_class_name(obj)
         # print(x,y,type_name)
-        if type_name in ["function", "builtin_function_or_method", "method_descriptor"] or parent_class in ["Primitive", "MAXScriptFunction"]:
+        if type_name in [
+            "function",
+            "builtin_function_or_method",
+            "method_descriptor",
+        ] or parent_class in ["Primitive", "MAXScriptFunction"]:
             line = write_method(name, obj, module, base_indent)
             lines = append_and_print(lines, line, output)
         elif type_name in classes:
@@ -251,6 +310,8 @@ def get_dir(module, indentation=0, classes=None, output=False):
                 increment = indentation + 1
                 sub_lines = get_dir(obj, increment, classes)
                 lines += sub_lines
+
+    lines.extend(find_structs())
     return lines
 
 
@@ -264,4 +325,5 @@ def run():
             file.write(line + "\n")
 
 
-run()
+for s in find_structs():
+    print(s)
